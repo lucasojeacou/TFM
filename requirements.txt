@@ -1,0 +1,27 @@
+# núcleo de inferencia
+# manipulación de matrices y cálculo vectorial
+numpy>=2.3.3
+
+# análisis y carga de datos tabulares
+pandas>=2.3.3
+
+# manejo de grafos y métricas topológicas
+networkx>=3.6.1
+
+# visualización científica estática auxiliar
+matplotlib>=3.10.8
+
+# interfaz web interactiva del dashboard
+streamlit>=1.57.0
+
+# gráficos interactivos del panel de control
+plotly>=6.7.0
+
+# renderizado interactivo de redes en html
+pyvis>=0.3.2
+
+# detección de comunidades con louvain
+python-louvain>=0.16
+
+# validación automatizada de la suite de pruebas
+pytest>=9.0.3

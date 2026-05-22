@@ -1,0 +1,38 @@
+# caches de python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# ruido de sistema y editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# datos crudos y artefactos de grafos
+datos/**
+*.edges
+*.circles
+*.egofeat
+*.feat
+*.featnames
+*.gexf
+*.gml
+*.graphml
+*.dot
+*.edgelist
+
+# resultados mutables del pipeline
+resultados/*.csv
+
+# html temporales generados por pyvis
+grafo_temporal.html
+*_temporal.html
+*_temp.html
+
+# test
+tests/__pycache__/
