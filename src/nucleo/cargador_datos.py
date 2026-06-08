@@ -1,15 +1,25 @@
-﻿import os
+"""Lectura de ficheros SNAP (.edges, .feat, .egofeat, .circles, .featnames)."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
 import networkx as nx
 
 
-# Carga el grafo original tal y como aparece en el archivo .edges
+def _ruta_archivo(ruta_datos, ego_id: int, extension: str) -> Path:
+    """Ruta al fichero SNAP ``{ego_id}.{extension}``."""
+    return Path(ruta_datos) / f"{ego_id}.{extension}"
+
+
 def cargar_grafo_base(ruta_datos, ego_id):
-    ruta_edges = os.path.join(ruta_datos, f"{ego_id}.edges")
-    return nx.read_edgelist(ruta_edges, nodetype=int)
+    """Grafo de amigos sin el nodo ego (solo aristas del fichero .edges)."""
+    ruta_edges = _ruta_archivo(ruta_datos, ego_id, "edges")
+    return nx.read_edgelist(str(ruta_edges), nodetype=int)
 
 
-# Reconstruye la ego-network añadiendo el nodo ego y conectándolo con todos los nodos existentes
 def reconstruir_ego(grafo, ego_id):
+    """Conecta el ego con todos los nodos existentes para formar la ego-red."""
     G = grafo.copy()
     nodo_ego = int(ego_id)
     nodos_existentes = list(G.nodes())
@@ -17,41 +27,38 @@ def reconstruir_ego(grafo, ego_id):
     return G
 
 
-# Carga los atributos de los amigos desde el archivo .feat
 def cargar_atributos_amigos(ruta_datos, ego_id):
-    ruta_feat = os.path.join(ruta_datos, f"{ego_id}.feat")
+    """Diccionario nodo → vector binario de atributos (.feat)."""
     atributos = {}
-    with open(ruta_feat, "r") as f:
+    with _ruta_archivo(ruta_datos, ego_id, "feat").open("r", encoding="utf-8") as f:
         for linea in f:
             partes = list(map(int, linea.split()))
             atributos[partes[0]] = partes[1:]
     return atributos
 
 
-# Carga los atributos reales del ego desde .egofeat
 def cargar_atributos_ego(ruta_datos, ego_id):
-    ruta_egofeat = os.path.join(ruta_datos, f"{ego_id}.egofeat")
-    with open(ruta_egofeat, "r") as f:
+    """Vector binario del perfil real del ego (.egofeat)."""
+    with _ruta_archivo(ruta_datos, ego_id, "egofeat").open("r", encoding="utf-8") as f:
         return list(map(int, f.read().split()))
 
 
-# Carga el nombre de cada atributo desde .featnames
 def cargar_nombres_atributos(ruta_datos, ego_id):
-    ruta_featnames = os.path.join(ruta_datos, f"{ego_id}.featnames")
+    """Lista ordenada de nombres descriptivos (.featnames)."""
     nombres = []
-    with open(ruta_featnames, "r") as f:
+    with _ruta_archivo(ruta_datos, ego_id, "featnames").open("r", encoding="utf-8") as f:
         for linea in f:
             partes = linea.strip().split()
             nombres.append(" ".join(partes[1:]))
     return nombres
 
 
-# Carga los círculos sociales definidos por el usuario
 def cargar_circulos(ruta_datos, ego_id):
-    ruta_circles = os.path.join(ruta_datos, f"{ego_id}.circles")
+    """Círculos sociales SNAP: nombre → lista de ids de miembros."""
+    ruta_circles = _ruta_archivo(ruta_datos, ego_id, "circles")
     circulos = {}
-    if os.path.exists(ruta_circles):
-        with open(ruta_circles, "r") as f:
+    if ruta_circles.exists():
+        with ruta_circles.open("r", encoding="utf-8") as f:
             for linea in f:
                 partes = linea.strip().split()
                 if partes:

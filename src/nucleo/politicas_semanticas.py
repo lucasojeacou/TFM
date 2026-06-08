@@ -1,112 +1,139 @@
-import os
-import sys
-import re
+"""Políticas de decisión por categoría: clasificación de ruido y binarización de puntuaciones."""
+
+from __future__ import annotations
+
 import numpy as np
 from typing import Any, Dict, List, Tuple
 
-# Tokeniza un texto extrayendo términos alfanuméricos limpios en minúsculas.
-def _tokenizar_semantica(texto: str) -> List[str]:
-    return [token for token in re.split(r"[^a-z0-9]+", texto.lower()) if token]
+from .umbrales import (
+    PENALIZACION_FRECUENCIA,
+    delta_minima_single_index,
+    umbral_dinamico_categoria,
+)
 
-# Clasifica dinámicamente una categoría analizando la distribución estadística en la matriz de amigos.
+
 def clasificar_politica_categoria(
     categoria: str,
     rango: Dict[str, int],
     mapeador: Any,
     atributos_amigos: Dict[int, List[int]],
-    umbral_bajo: float,
-    umbral_alto: float,
 ) -> Dict[str, Any]:
+    """Elige modo ruido, valor único o multi-valor según densidad y dispersión de la categoría."""
     cat_normalizada = str(categoria).strip().lower()
-    
-    # FILTRO SEMÁNTICO CRÍTICO: Forzamos a ruido datos de identidad, locales o campos caóticos no inferibles topológicamente
     palabras_prohibidas = {"birthday", "name"}
     if cat_normalizada in palabras_prohibidas or any(p in cat_normalizada for p in palabras_prohibidas):
-        return {"modo": "ruido", "umbral": umbral_alto, "max_k": 0}
+        return {"modo": "ruido", "max_k": 0}
 
-    inicio, fin = rango["inicio"], rango["fin"]
-    
-    # Transformamos en matriz de NumPy y extraemos en bloque el rango de la categoría
-    matriz_cat = np.array(list(atributos_amigos.values()))[:, inicio : fin + 1]
-    
-    # Filtro de Coincidencia Estructural Mínima: Si el bit más repetido lo tienen 2 o menos amigos, es ruido disperso
+    inicio, fin = int(rango["inicio"]), int(rango["fin"])
+    lista_attrs = list(atributos_amigos.values())
+    if not lista_attrs:
+        return {"modo": "ruido", "max_k": 0}
+    try:
+        matriz_base = np.asarray(lista_attrs, dtype=float)
+    except ValueError:
+        return {"modo": "ruido", "max_k": 0}
+    if matriz_base.ndim != 2 or matriz_base.size == 0:
+        return {"modo": "ruido", "max_k": 0}
+    columnas = matriz_base.shape[1]
+    if inicio < 0 or fin < inicio or inicio >= columnas:
+        return {"modo": "ruido", "max_k": 0}
+    fin_seguro = min(fin, columnas - 1)
+    matriz_cat = matriz_base[:, inicio : fin_seguro + 1]
     if matriz_cat.size == 0 or np.max(np.sum(matriz_cat, axis=0)) <= 2:
-        return {"modo": "ruido", "umbral": umbral_alto, "max_k": 0}
+        return {"modo": "ruido", "max_k": 0}
 
-    # Filtro de Índice Único: Contamos cuántos atributos activa cada usuario que rellenó el campo
     activos = np.sum(matriz_cat, axis=1)
     usuarios_validos = activos[activos > 0]
-
     if usuarios_validos.size == 0:
-        return {"modo": "ruido", "umbral": umbral_alto, "max_k": 0}
+        return {"modo": "ruido", "max_k": 0}
 
-    # Calculamos la media real de opciones que rellena un usuario en esta red específica
+    tamano_rango = fin_seguro - inicio + 1
+    umbral = umbral_dinamico_categoria(tamano_rango)
+
     media_activos = np.mean(usuarios_validos)
-
-    # Si la media exacta de bits encendidos es 1.0, la categoría es de exclusión mutua (ej: género)
     if media_activos == 1.0:
-        return {"modo": "single_index", "umbral": umbral_bajo, "max_k": 1}
+        return {"modo": "single_index", "umbral": umbral, "max_k": 1}
 
-    # NUEVA LÓGICA MULTI-VALOR ADAPTATIVA: El límite real es la media de los amigos + 1 (redondeado hacia arriba)
     max_k = int(np.ceil(media_activos)) + 1
-    
-    # Control defensivo de seguridad: En rangos pequeños o densos, impedimos predecir el 100% de las opciones
-    tamano_rango = fin - inicio + 1
     if tamano_rango <= 3:
         max_k = 1
     else:
         max_k = min(max_k, tamano_rango - 1)
+    return {"modo": "multi_k", "umbral": umbral, "max_k": max_k}
 
-    return {"modo": "multi_k", "umbral": umbral_bajo, "max_k": max_k}
 
-# Aplica la política binarizadora dinámica protegiendo las exclusiones de índices únicos.
 def seleccionar_por_categoria(
     puntuaciones: Dict[int, float],
     mapeador: Any,
     atributos_amigos: Dict[int, List[int]],
-    umbral_bajo: float = 0.12,
-    umbral_alto: float = 0.22,
 ) -> Tuple[List[int], Dict[str, Tuple[Any, float]]]:
+    """Convierte puntuaciones continuas en vector binario por categoría semántica."""
     if mapeador is None or not hasattr(mapeador, "esquema_rangos"):
         return [], {}
 
-    total_attrs = len(mapeador.indices_mapeados) if hasattr(mapeador, "indices_mapeados") else max(puntuaciones.keys()) + 1
+    total_attrs = len(mapeador.indices_mapeados) if hasattr(mapeador, "indices_mapeados") else (max(puntuaciones.keys()) + 1 if puntuaciones else 0)
     inferidos = [0] * total_attrs
     elegido_por_categoria = {}
 
+    puntuaciones_penalizadas = {}
+    if atributos_amigos:
+        lista_amigos = list(atributos_amigos.values())
+        if lista_amigos:
+            try:
+                matriz_amigos = np.asarray(lista_amigos, dtype=float)
+            except ValueError:
+                matriz_amigos = np.empty((0, 0))
+            if matriz_amigos.ndim == 2 and matriz_amigos.size > 0:
+                frecuencias_globales = np.mean(matriz_amigos, axis=0)
+                for idx, score in puntuaciones.items():
+                    if 0 <= idx < len(frecuencias_globales):
+                        frec_global = float(frecuencias_globales[idx])
+                        puntuaciones_penalizadas[idx] = score * (1.0 - PENALIZACION_FRECUENCIA * frec_global)
+                    else:
+                        puntuaciones_penalizadas[idx] = score
+            else:
+                puntuaciones_penalizadas = dict(puntuaciones)
+        else:
+            puntuaciones_penalizadas = dict(puntuaciones)
+    else:
+        puntuaciones_penalizadas = dict(puntuaciones)
+
     for cat, rango in mapeador.esquema_rangos.items():
-        politica = clasificar_politica_categoria(cat, rango, mapeador, atributos_amigos, umbral_bajo, umbral_alto)
-        inicio, fin = rango["inicio"], rango["fin"]
-        
-        # Reseteo estricto para categorías exclusivas
+        politica = clasificar_politica_categoria(cat, rango, mapeador, atributos_amigos)
+        inicio, fin = int(rango["inicio"]), int(rango["fin"])
+
         if politica["modo"] == "single_index":
-            for i in range(inicio, fin + 1): inferidos[i] = 0
-        if politica["modo"] == "ruido": 
+            for i in range(inicio, fin + 1):
+                if 0 <= i < len(inferidos):
+                    inferidos[i] = 0
+        if politica["modo"] == "ruido":
             continue
 
-        indices_cat = [i for i in range(inicio, fin + 1) if i in puntuaciones]
-        if not indices_cat: 
+        indices_cat = [i for i in range(inicio, fin + 1) if 0 <= i < len(inferidos) and i in puntuaciones_penalizadas]
+        if not indices_cat:
             continue
 
-        ordenados = sorted(indices_cat, key=lambda idx: puntuaciones.get(idx, 0.0), reverse=True)
+        ordenados = sorted(indices_cat, key=lambda idx: puntuaciones_penalizadas.get(idx, 0.0), reverse=True)
         mejor_idx = ordenados[0]
-        mejor_score = puntuaciones.get(mejor_idx, 0.0)
+        mejor_score = puntuaciones_penalizadas.get(mejor_idx, 0.0)
 
         if politica["modo"] == "single_index":
-            segundo_score = puntuaciones.get(ordenados[1], 0.0) if len(ordenados) > 1 else 0.0
-            # Desempate competitivo por margen delta mínimo de 0.05
-            if mejor_score >= politica["umbral"] and (mejor_score - segundo_score) >= 0.05:
+            segundo_score = puntuaciones_penalizadas.get(ordenados[1], 0.0) if len(ordenados) > 1 else 0.0
+            delta = delta_minima_single_index(len(atributos_amigos))
+
+            if mejor_score >= politica["umbral"] and (mejor_score - segundo_score) >= delta:
                 inferidos[mejor_idx] = 1
                 elegido_por_categoria[cat] = (mejor_idx, mejor_score)
             else:
                 elegido_por_categoria[cat] = (None, mejor_score)
             continue
 
-        # Inferencia multi-valor adaptativa filtrada por el max_k basado en el vecindario
-        seleccionados = [i for i in ordenados if puntuaciones.get(i, 0.0) >= politica["umbral"]][:politica["max_k"]]
+        seleccionados = [i for i in ordenados if puntuaciones_penalizadas.get(i, 0.0) >= politica["umbral"]][:politica["max_k"]]
         if seleccionados:
-            for i in seleccionados: inferidos[i] = 1
-            elegido_por_categoria[cat] = (seleccionados[0], puntuaciones.get(seleccionados[0], 0.0))
+            for i in seleccionados:
+                if 0 <= i < len(inferidos):
+                    inferidos[i] = 1
+            elegido_por_categoria[cat] = (seleccionados[0], puntuaciones_penalizadas.get(seleccionados[0], 0.0))
         else:
             elegido_por_categoria[cat] = (None, mejor_score)
 

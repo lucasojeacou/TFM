@@ -1,34 +1,36 @@
-﻿# Estrategia de inferencia basada en transitividad estructural y propagación a dos saltos.
-# 
-# Lógica de inferencia:
-# - Filtra y calcula el impacto del primer salto ponderando de forma inversa al grado.
-# - Explora la vecindad extendida eliminando redundancias hacia el ego o la primera capa.
-# - Aplica factores de decaimiento lineal para equilibrar el lazo directo y el lazo profundo.
-# - Consolida vectorialmente la matriz de atribución final y delega la purga a la base.
+"""Combinación ponderada de señales a 1 y 2 saltos desde el ego."""
+
+from __future__ import annotations
 
 import numpy as np
+
 from .base import EstrategiaInferencia
 
-class EstrategiaTransitividad(EstrategiaInferencia):
 
-    def inferir(self, nodo_id, alpha=1.0, beta=0.6, umbral_bajo=0.12, umbral_alto=0.22):
+class EstrategiaTransitividad(EstrategiaInferencia):
+    """Mezcla atributos de vecinos directos y nodos a dos saltos (α=1.0, β=0.6)."""
+
+    def inferir(self, nodo_id, circulos=None):
+        """Combina señales a 1 y 2 saltos con pesos α=1.0 y β=0.6."""
+        alpha = 1.0
+        beta = 0.6
         vecinos = self.obtener_vecinos_validos(nodo_id)
         vecinos_set = set(vecinos)
         num_attrs = len(self.mapeador.indices_mapeados)
 
         if not vecinos:
-            return self.finalizar_inferencia([], {}, None, umbral_bajo, umbral_alto)
+            return self.finalizar_inferencia([], {}, None)
 
         matriz_1hop = np.array([self.atributos_amigos[v] for v in vecinos])
         grados_1hop = np.array([self.grafo.degree(v) for v in vecinos])
-        
-        with np.errstate(divide='ignore', invalid='ignore'):
+
+        with np.errstate(divide="ignore", invalid="ignore"):
             pesos_1hop = 1.0 / np.sqrt(grados_1hop)
         pesos_1hop[~np.isfinite(pesos_1hop)] = 0.0
-        
+
         suma_1hop = np.sum(pesos_1hop)
         pesos_1hop_norm = pesos_1hop / (suma_1hop if suma_1hop > 0 else 1.0)
-        
+
         puntuaciones_1hop = np.dot(matriz_1hop.T, pesos_1hop_norm)
         contrib_1hop = matriz_1hop.T * pesos_1hop_norm
 
@@ -52,11 +54,20 @@ class EstrategiaTransitividad(EstrategiaInferencia):
             suma_2hop = np.sum(pesos_2hop)
             pesos_2hop_norm = pesos_2hop / (suma_2hop if suma_2hop > 0 else 1.0)
             puntuaciones_2hop = np.dot(matriz_2hop.T, pesos_2hop_norm)
+            contrib_2hop = matriz_2hop.T * pesos_2hop_norm
         else:
             puntuaciones_2hop = np.zeros(num_attrs)
+            contrib_2hop = np.zeros((num_attrs, 0))
 
         puntuaciones_vector = (alpha * puntuaciones_1hop + beta * puntuaciones_2hop) / (alpha + beta)
         puntuaciones = {i: float(val) for i, val in enumerate(puntuaciones_vector)}
-        contrib_xai_final = contrib_1hop * (alpha / (alpha + beta))
+        contrib_xai_final = np.concatenate(
+            [
+                contrib_1hop * (alpha / (alpha + beta)),
+                contrib_2hop * (beta / (alpha + beta)),
+            ],
+            axis=1,
+        )
+        nodos_xai = list(vecinos) + list(vecinos_2hop)
 
-        return self.finalizar_inferencia(vecinos, puntuaciones, contrib_xai_final, umbral_bajo, umbral_alto)
+        return self.finalizar_inferencia(nodos_xai, puntuaciones, contrib_xai_final)
