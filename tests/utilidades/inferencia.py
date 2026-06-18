@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Type
 
 from src.estrategias.base import EstrategiaInferencia
-from src.interfaz.configuracion import STRATEGY_REGISTRY
+from src.registro import STRATEGY_REGISTRY
 
 ESTRATEGIAS = [item["class"] for item in STRATEGY_REGISTRY]
 

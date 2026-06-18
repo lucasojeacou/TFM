@@ -5,31 +5,31 @@ from __future__ import annotations
 import numpy as np
 import networkx as nx
 
-from .base import EstrategiaInferencia
+from .base import EstrategiaInferencia, ResultadoInferencia
 
 
 class EstrategiaPuentes(EstrategiaInferencia):
     """Media ponderada de atributos según centralidad de intermediación y círculos compartidos."""
 
-    def __init__(self, grafo, atributos_amigos, mapeador):
+    def __init__(self, grafo, atributos_amigos: dict[int, list[int]], mapeador) -> None:
         """Inicializa la estrategia y reserva caché interna de centralidad."""
         super().__init__(grafo, atributos_amigos, mapeador)
-        self._cache_centralidad = None
+        self._cache_centralidad: dict[int, float] | None = None
 
-    def _obtener_centralidad(self):
+    def centralidad_intermediacion(self) -> dict[int, float]:
         """Centralidad de intermediación de la ego-red; se calcula una sola vez por instancia."""
         if self._cache_centralidad is not None:
             return self._cache_centralidad
         self._cache_centralidad = nx.betweenness_centrality(self.grafo)
         return self._cache_centralidad
 
-    def inferir(self, nodo_id, circulos=None):
+    def inferir(self, nodo_id: int, circulos: dict[str, list[int]] | None = None) -> ResultadoInferencia:
         """Pondera atributos por intermediación y solapamiento de círculos sociales."""
         vecinos = self.obtener_vecinos_validos(nodo_id)
         if not vecinos:
             return self.finalizar_inferencia([], {}, None)
         circulos = circulos or {}
-        centralidad = self._obtener_centralidad()
+        centralidad = self.centralidad_intermediacion()
         vector_pesos_lista = []
         for v in vecinos:
             num_circulos_compartidos = sum(1 for miembros in circulos.values() if nodo_id in miembros and v in miembros)

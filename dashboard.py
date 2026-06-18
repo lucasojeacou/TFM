@@ -7,8 +7,8 @@ from pathlib import Path
 import streamlit as st
 
 from src.interfaz.analisis import leer_csv_seguro
-from src.interfaz.configuracion import estrategias_para_dashboard
-from src.interfaz.datos import descubrir_ego_ids
+from src.nucleo.cargador_datos import descubrir_ego_ids
+from src.registro import estrategias_para_dashboard
 from src.interfaz.dashboard.auditoria import renderizar_pestana_auditoria
 from src.interfaz.dashboard.estilos import cargar_estilos
 from src.interfaz.dashboard.resultados import renderizar_pestana_resultados

@@ -2,24 +2,23 @@
 
 from __future__ import annotations
 
-from typing import Dict, List
-
 import streamlit as st
 
 from src.interfaz.inferencia import etiqueta_atributo, indices_rango
+from src.nucleo.grafo_utils import iter_pares_segundo_salto
 
 
 def filas_frecuencia_categoria(
-    vecinos_validos: List[int],
-    atributos_amigos: Dict[int, List[int]],
+    vecinos_validos: list[int],
+    atributos_amigos: dict[int, list[int]],
     mapeador,
     category_key: str,
     limit: int = 5,
-) -> List[Dict[str, object]]:
+) -> list[dict[str, object]]:
     """Top atributos más frecuentes en la vecindad para una categoría."""
     indices = indices_rango(mapeador, category_key)
     total_vecinos = max(1, len(vecinos_validos))
-    conteo: Dict[int, int] = {idx: 0 for idx in indices}
+    conteo: dict[int, int] = {idx: 0 for idx in indices}
 
     for vecino in vecinos_validos:
         attrs = atributos_amigos.get(vecino, [])
@@ -38,7 +37,7 @@ def filas_frecuencia_categoria(
     return sorted(filas, key=lambda item: item["score"], reverse=True)[:limit]
 
 
-def filas_resumen_circulos(circulos: Dict[str, List[int]], vecinos_validos: List[int], limit: int = 5) -> List[Dict[str, object]]:
+def filas_resumen_circulos(circulos: dict[str, list[int]], vecinos_validos: list[int], limit: int = 5) -> list[dict[str, object]]:
     """Penetración de vecinos en cada círculo social SNAP."""
     total_vecinos = max(1, len(vecinos_validos))
     rows = []
@@ -51,11 +50,11 @@ def filas_resumen_circulos(circulos: Dict[str, List[int]], vecinos_validos: List
     return sorted(rows, key=lambda item: item["score"], reverse=True)[:limit]
 
 
-def filas_resumen_puentes(strategy, vecinos_validos: List[int], limit: int = 5) -> List[Dict[str, object]]:
+def filas_resumen_puentes(strategy, vecinos_validos: list[int], limit: int = 5) -> list[dict[str, object]]:
     """Vecinos ordenados por centralidad de intermediación."""
     if not vecinos_validos:
         return []
-    centralidad = strategy._obtener_centralidad() if hasattr(strategy, "_obtener_centralidad") else {}
+    centralidad = strategy.centralidad_intermediacion() or {}
     rows = []
     for vecino in vecinos_validos:
         score = float(centralidad.get(vecino, 0.0))
@@ -66,40 +65,43 @@ def filas_resumen_puentes(strategy, vecinos_validos: List[int], limit: int = 5) 
 def filas_resumen_transitividad(
     grafo,
     ego_id: int,
-    vecinos_validos: List[int],
-    atributos_amigos: Dict[int, List[int]],
+    vecinos_validos: list[int],
+    atributos_amigos: dict[int, list[int]],
     limit: int = 5,
-) -> List[Dict[str, object]]:
+) -> list[dict[str, object]]:
     """Nodos a dos saltos más conectados con la vecindad directa."""
-    vecinos_set = set(vecinos_validos)
-    nodos_2hop = []
-    for vecino in vecinos_validos:
-        for candidato in grafo.neighbors(vecino):
-            if int(candidato) == ego_id or int(candidato) in vecinos_set or int(candidato) not in atributos_amigos:
-                continue
-            nodos_2hop.append(int(candidato))
-    if not nodos_2hop:
+    conteo: dict[int, int] = {}
+    for _, candidato in iter_pares_segundo_salto(grafo, ego_id, vecinos_validos, atributos_amigos):
+        conteo[candidato] = conteo.get(candidato, 0) + 1
+    if not conteo:
         return []
-    conteo: Dict[int, int] = {}
-    for nodo in nodos_2hop:
-        conteo[nodo] = conteo.get(nodo, 0) + 1
-    return sorted([{"label": f"Nodo {nodo}", "score": count / len(vecinos_validos), "detail": f"aparece en {count} caminos"} for nodo, count in conteo.items()], key=lambda item: item["score"], reverse=True)[:limit]
+    total = max(1, len(vecinos_validos))
+    return sorted(
+        [
+            {"label": f"Nodo {nodo}", "score": count / total, "detail": f"aparece en {count} caminos"}
+            for nodo, count in conteo.items()
+        ],
+        key=lambda item: item["score"],
+        reverse=True,
+    )[:limit]
 
 
-def filas_resumen_similitud(strategy, ego_id: int, limit: int = 5) -> List[Dict[str, object]]:
+def filas_resumen_similitud(strategy, ego_id: int, limit: int = 5) -> list[dict[str, object]]:
     """Top nodos por similitud estructural Adamic-Adar."""
-    if not hasattr(strategy, "_obtener_similitudes_estructurales"):
+    similitudes = strategy.similitudes_estructurales(ego_id)
+    if not similitudes:
         return []
-    similitudes = strategy._obtener_similitudes_estructurales(ego_id)
     return [{"label": f"Nodo {nodo}", "score": float(score), "detail": "Adamic-Adar"} for nodo, score in similitudes[:limit]]
 
 
-def filas_resumen_comunidades(strategy, ego_id: int, vecinos_validos: List[int], limit: int = 5) -> List[Dict[str, object]]:
+def filas_resumen_comunidades(strategy, ego_id: int, vecinos_validos: list[int], limit: int = 5) -> list[dict[str, object]]:
     """Distribución de vecinos entre comunidades Louvain detectadas."""
-    if not vecinos_validos or not hasattr(strategy, "_obtener_comunidades_subgrafo"):
+    if not vecinos_validos:
         return []
-    comunidades = strategy._obtener_comunidades_subgrafo(ego_id, vecinos_validos)
-    conteo: Dict[int, int] = {}
+    comunidades = strategy.comunidades_locales(ego_id, vecinos_validos)
+    if not comunidades:
+        return []
+    conteo: dict[int, int] = {}
     for nodo, comunidad_id in comunidades.items():
         conteo[int(comunidad_id)] = conteo.get(int(comunidad_id), 0) + 1
     total = max(1, len(vecinos_validos))
@@ -107,7 +109,7 @@ def filas_resumen_comunidades(strategy, ego_id: int, vecinos_validos: List[int],
     return sorted(rows, key=lambda item: item["score"], reverse=True)[:limit]
 
 
-def renderizar_filas_influencia(rows: List[Dict[str, object]]) -> None:
+def renderizar_filas_influencia(rows: list[dict[str, object]]) -> None:
     """Gráfico de barras horizontales con las contribuciones de explicabilidad principales."""
     if not rows:
         return

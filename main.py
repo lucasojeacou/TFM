@@ -10,6 +10,7 @@ from src.nucleo.cargador_datos import (
     cargar_atributos_ego,
     cargar_circulos,
     cargar_grafo_base,
+    descubrir_ego_ids,
     reconstruir_ego,
 )
 from src.nucleo.mapeo_atributos import analizar_red
@@ -18,8 +19,7 @@ from src.nucleo.evaluacion import (
     exportar_datos_incrementales,
     exportar_resultados_csv,
 )
-from src.interfaz.configuracion import estrategias_para_batch
-from src.interfaz.datos import descubrir_ego_ids
+from src.registro import estrategias_para_batch
 
 logger = logging.getLogger(__name__)
 

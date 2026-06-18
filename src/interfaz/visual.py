@@ -156,10 +156,7 @@ def colores_comunidades_vecinos(estrategia, ego_id, vecinos_validos) -> tuple[di
     """Asignación nodo → comunidad y comunidad → color vía Louvain."""
     if estrategia is None or ego_id is None:
         return {}, {}
-    obtener = getattr(estrategia, "_obtener_comunidades_subgrafo", None)
-    if obtener is None:
-        return {}, {}
-    comunidades = obtener(ego_id, list(vecinos_validos)) or {}
+    comunidades = estrategia.comunidades_locales(ego_id, list(vecinos_validos)) or {}
     if not comunidades:
         return {}, {}
     cids = sorted(set(comunidades.values()))

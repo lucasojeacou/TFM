@@ -4,16 +4,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Tuple
+from collections.abc import Iterable
 
 import pandas as pd
 
-from src.nucleo.evaluacion import calcular_metricas_binarias
+from src.nucleo.evaluacion import calcular_metricas_binarias, estado_categoria
 from src.nucleo.politicas_semanticas import clasificar_politica_categoria
-from src.interfaz.configuracion import STRATEGY_REGISTRY
+from src.registro import construir_estrategia
 from src.interfaz.datos import cargar_snapshot
 from src.interfaz.inferencia import (
-    construir_estrategia,
     formato_atributos_activados,
     indices_rango,
     numero_feat_dataset,
@@ -25,21 +24,21 @@ class InferenceSnapshot:
     """Datos inmutables de una ego-red cargada desde SNAP."""
 
     grafo: object
-    atributos_amigos: Dict[int, List[int]]
-    perfil_ego: List[int]
-    circulos: Dict[str, List[int]]
+    atributos_amigos: dict[int, list[int]]
+    perfil_ego: list[int]
+    circulos: dict[str, list[int]]
     mapeador: object
-    posiciones: Dict[int, Tuple[float, float]]
+    posiciones: dict[int, tuple[float, float]]
 
 
 @dataclass(frozen=True)
 class InferenceResult:
     """Salida de una inferencia: vector binario, ganadores por categoría y explicabilidad."""
 
-    inferidos: List[int]
-    elegido_por_categoria: Dict[str, Tuple[object, float]]
-    contribuciones_xai: Dict[int, Dict[int, float]]
-    metricas: Dict[str, float]
+    inferidos: list[int]
+    elegido_por_categoria: dict[str, tuple[object, float]]
+    contribuciones_xai: dict[int, dict[int, float]]
+    metricas: dict[str, float]
 
 
 def cargar_instantanea(ruta_datos: Path, ego_id: int) -> InferenceSnapshot:
@@ -54,7 +53,7 @@ def ejecutar_inferencia(
     strategy_key: str,
 ) -> InferenceResult:
     """Ejecuta la estrategia indicada y calcula métricas frente al perfil real."""
-    estrategia = construir_estrategia(STRATEGY_REGISTRY, strategy_key, snapshot.grafo, snapshot.atributos_amigos, snapshot.mapeador)
+    estrategia = construir_estrategia(strategy_key, snapshot.grafo, snapshot.atributos_amigos, snapshot.mapeador)
     inferidos, elegido_por_categoria, xai = estrategia.inferir(int(ego_id), circulos=snapshot.circulos)
     metricas = calcular_metricas_binarias(snapshot.perfil_ego, inferidos)
     return InferenceResult(list(inferidos), dict(elegido_por_categoria), dict(xai or {}), metricas)
@@ -62,8 +61,8 @@ def ejecutar_inferencia(
 
 def categorias_evaluables(
     mapeador,
-    atributos_amigos: Dict[int, List[int]],
-) -> List[str]:
+    atributos_amigos: dict[int, list[int]],
+) -> list[str]:
     """Categorías con política distinta de ruido (aptas para auditoría)."""
     categorias = []
     for categoria, rango in sorted(mapeador.esquema_rangos.items(), key=lambda item: item[1]["inicio"]):
@@ -73,7 +72,7 @@ def categorias_evaluables(
     return categorias
 
 
-def activos_en_rango(vector: Iterable[int], indices: Iterable[int]) -> List[int]:
+def activos_en_rango(vector: Iterable[int], indices: Iterable[int]) -> list[int]:
     """Índices con valor 1 dentro del rango dado."""
     activos = []
     for idx in indices:
@@ -83,19 +82,6 @@ def activos_en_rango(vector: Iterable[int], indices: Iterable[int]) -> List[int]
         except IndexError:
             continue
     return activos
-
-
-def estado_categoria(reales: List[int], predichos: List[int]) -> str:
-    """Etiqueta de acierto: Correcto, Parcial, Fallido o Sin datos."""
-    reales_set = set(reales)
-    predichos_set = set(predichos)
-    if not reales_set and not predichos_set:
-        return "Sin datos"
-    if reales_set == predichos_set:
-        return "Correcto"
-    if not reales_set.isdisjoint(predichos_set):
-        return "Parcial"
-    return "Fallido"
 
 
 def construir_auditoria(snapshot: InferenceSnapshot, resultado: InferenceResult) -> pd.DataFrame:

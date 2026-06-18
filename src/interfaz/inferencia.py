@@ -4,16 +4,15 @@ from __future__ import annotations
 
 import colorsys
 import re
-from typing import Dict, List, Optional, Tuple
 
 
-def indices_rango(mapeador, category_key: str) -> List[int]:
+def indices_rango(mapeador, category_key: str) -> list[int]:
     """Índices enteros consecutivos de una categoría semántica."""
     rango = mapeador.esquema_rangos[category_key]
     return list(range(rango["inicio"], rango["fin"] + 1))
 
 
-def generar_paleta(count: int) -> List[str]:
+def generar_paleta(count: int) -> list[str]:
     """Colores hex equidistantes en HLS para distinguir valores de una categoría."""
     if count <= 0:
         return []
@@ -29,7 +28,7 @@ def generar_paleta(count: int) -> List[str]:
     return palette
 
 
-def paleta_categoria(mapeador, category_key: str) -> Dict[int, str]:
+def paleta_categoria(mapeador, category_key: str) -> dict[int, str]:
     """Mapa índice de atributo → color para una categoría."""
     indices = indices_rango(mapeador, category_key)
     colors = generar_paleta(len(indices))
@@ -65,9 +64,9 @@ def numero_feat_dataset(mapeador, idx: int) -> str:
 def resolver_indice_inferido_ego(
     mapeador,
     category_key: str,
-    elegido_por_categoria: Dict[str, Tuple[object, float]],
-    inferidos: Optional[List[int]],
-) -> Optional[int]:
+    elegido_por_categoria: dict[str, tuple[object, float]],
+    inferidos: list[int] | None,
+) -> int | None:
     """Atributo ganador de la categoría para colorear el ego en fase 4."""
     indices_cat = indices_rango(mapeador, category_key)
     predichos = [
@@ -86,12 +85,12 @@ def resolver_indice_inferido_ego(
 def indices_leyenda_categoria(
     mapeador,
     category_key: str,
-    atributos_amigos: Dict[int, List[int]],
+    atributos_amigos: dict[int, list[int]],
     vecinos_validos,
     phase: int,
-    inferidos: Optional[List[int]] = None,
-    elegido_por_categoria: Optional[Dict[str, Tuple[object, float]]] = None,
-) -> List[int]:
+    inferidos: list[int] | None = None,
+    elegido_por_categoria: dict[str, tuple[object, float]] | None = None,
+) -> list[int]:
     """Atributos que deben aparecer en la leyenda de fases 3-4."""
     indices = indices_coloreados_en_grafo(mapeador, category_key, atributos_amigos, vecinos_validos)
     if int(phase) >= 4:
@@ -115,7 +114,7 @@ def indice_atributo_dominante_nodo(mapeador, category_key: str, values) -> int |
     return None
 
 
-def indices_coloreados_en_grafo(mapeador, category_key: str, atributos_amigos: Dict[int, List[int]], vecinos_validos) -> List[int]:
+def indices_coloreados_en_grafo(mapeador, category_key: str, atributos_amigos: dict[int, list[int]], vecinos_validos) -> list[int]:
     """Atributos que determinan el color de al menos un vecino visible."""
     visibles = set()
     for vecino in vecinos_validos:
@@ -129,20 +128,10 @@ def indices_coloreados_en_grafo(mapeador, category_key: str, atributos_amigos: D
     return [idx for idx in orden if idx in visibles]
 
 
-def formato_atributos_activados(mapeador, category_key: str, vector: List[int]) -> str:
+def formato_atributos_activados(mapeador, category_key: str, vector: list[int]) -> str:
     """Lista legible de featnames activos en una categoría ('Ninguno' si vacío)."""
     indices = indices_rango(mapeador, category_key)
     activos = [idx for idx in indices if idx < len(vector) and int(vector[idx]) == 1]
     if not activos:
         return "Ninguno"
     return ", ".join(numero_feat_dataset(mapeador, idx) for idx in activos)
-
-
-def construir_estrategia(strategy_registry: List[Dict[str, object]], strategy_key: str, grafo, atributos_amigos, mapeador):
-    """Instancia la clase de estrategia registrada o la base como respaldo."""
-    mapping = {item["key"]: item["class"] for item in strategy_registry}
-    strategy_cls = mapping.get(strategy_key)
-    if strategy_cls is None:
-        from src.estrategias.base import EstrategiaInferencia
-        strategy_cls = EstrategiaInferencia
-    return strategy_cls(grafo, atributos_amigos, mapeador)

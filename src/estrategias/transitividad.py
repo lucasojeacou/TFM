@@ -4,18 +4,19 @@ from __future__ import annotations
 
 import numpy as np
 
-from .base import EstrategiaInferencia
+from .base import EstrategiaInferencia, ResultadoInferencia
+from .parametros import TRANSITIVIDAD_ALPHA, TRANSITIVIDAD_BETA
+from ..nucleo.grafo_utils import iter_pares_segundo_salto
 
 
 class EstrategiaTransitividad(EstrategiaInferencia):
-    """Mezcla atributos de vecinos directos y nodos a dos saltos (α=1.0, β=0.6)."""
+    """Mezcla atributos de vecinos directos (1 salto) y nodos a 2 saltos del ego."""
 
-    def inferir(self, nodo_id, circulos=None):
-        """Combina señales a 1 y 2 saltos con pesos α=1.0 y β=0.6."""
-        alpha = 1.0
-        beta = 0.6
+    def inferir(self, nodo_id: int, circulos: dict[str, list[int]] | None = None) -> ResultadoInferencia:
+        """Combina señales a 1 y 2 saltos con pesos alpha y beta."""
+        alpha = TRANSITIVIDAD_ALPHA
+        beta = TRANSITIVIDAD_BETA
         vecinos = self.obtener_vecinos_validos(nodo_id)
-        vecinos_set = set(vecinos)
         num_attrs = len(self.mapeador.indices_mapeados)
 
         if not vecinos:
@@ -38,15 +39,12 @@ class EstrategiaTransitividad(EstrategiaInferencia):
         pesos_2hop_lista = []
         nodos_2hop_vistos = set()
 
-        for v in vecinos:
-            gr_v = self.grafo.degree(v)
-            for v2 in self.grafo.neighbors(v):
-                if v2 != nodo_id and v2 not in vecinos_set and v2 in self.atributos_amigos:
-                    if v2 not in nodos_2hop_vistos:
-                        nodos_2hop_vistos.add(v2)
-                        vecinos_2hop.append(v2)
-                        peso_v2 = 1.0 / (np.sqrt(gr_v) * np.sqrt(self.grafo.degree(v2)))
-                        pesos_2hop_lista.append(peso_v2)
+        for v, v2 in iter_pares_segundo_salto(self.grafo, nodo_id, vecinos, self.atributos_amigos):
+            if v2 not in nodos_2hop_vistos:
+                nodos_2hop_vistos.add(v2)
+                vecinos_2hop.append(v2)
+                peso_v2 = 1.0 / (np.sqrt(self.grafo.degree(v)) * np.sqrt(self.grafo.degree(v2)))
+                pesos_2hop_lista.append(peso_v2)
 
         if vecinos_2hop:
             matriz_2hop = np.array([self.atributos_amigos[v2] for v2 in vecinos_2hop])

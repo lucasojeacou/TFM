@@ -3,17 +3,16 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import Dict, List
 
 
-def generar_indices_mapeados(featnames: List[str]) -> Dict[int, str]:
+def generar_indices_mapeados(featnames: list[str]) -> dict[int, str]:
     """Índice de vector → nombre descriptivo en minúsculas."""
     return {i: nombre.lower() for i, nombre in enumerate(featnames)}
 
 
-def generar_esquema(indices_mapeados: Dict[int, str]) -> Dict[str, Dict[str, int]]:
+def generar_esquema(indices_mapeados: dict[int, str]) -> dict[str, dict[str, int]]:
     """Agrupa índices consecutivos por prefijo semántico (antes de 'anonymized')."""
-    esquema: Dict[str, Dict[str, int]] = {}
+    esquema: dict[str, dict[str, int]] = {}
     for idx, nombre in indices_mapeados.items():
         keyword = "anonymized"
         if keyword in nombre:
@@ -28,7 +27,7 @@ def generar_esquema(indices_mapeados: Dict[int, str]) -> Dict[str, Dict[str, int
     return esquema
 
 
-def _construir_mapeador(featnames: List[str]) -> SimpleNamespace:
+def _construir_mapeador(featnames: list[str]) -> SimpleNamespace:
     """Ensambla índices y esquema de rangos a partir de featnames."""
     indices_mapeados = generar_indices_mapeados(featnames)
     esquema_rangos = generar_esquema(indices_mapeados)

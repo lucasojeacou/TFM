@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Any, Dict, List, Type
+from typing import Any
 
 from src.interfaz.inferencia import (
     etiqueta_atributo,
@@ -24,12 +24,12 @@ from src.interfaz.visual import (
     tarjeta_leyenda,
 )
 
-STRATEGY_UI_REGISTRY: Dict[str, Type["StrategyUI"]] = {}
+STRATEGY_UI_REGISTRY: dict[str, type["StrategyUI"]] = {}
 
 
 def register_strategy_ui(*strategy_keys: str):
     """Registra una clase de plugin UI para una o más claves de estrategia."""
-    def decorator(cls: Type["StrategyUI"]):
+    def decorator(cls: type["StrategyUI"]):
         """Asocia la clase UI a cada clave de estrategia indicada."""
         for strategy_key in strategy_keys:
             STRATEGY_UI_REGISTRY[strategy_key] = cls
@@ -50,11 +50,11 @@ class StrategyUI:
         """Título de la leyenda en fase 2."""
         return "Vecindad directa"
 
-    def _tarjetas_fase2(self, **ctx) -> List[Dict[str, Any]]:
+    def _tarjetas_fase2(self, **ctx) -> list[dict[str, Any]]:
         """Tarjetas de nodos para la leyenda de fase 2."""
         return tarjetas_vecindad_directa()
 
-    def _aristas_fase2(self, **ctx) -> List[Dict[str, Any]]:
+    def _aristas_fase2(self, **ctx) -> list[dict[str, Any]]:
         """Tarjetas de aristas para la leyenda de fase 2."""
         return tarjetas_aristas_vecinos() if self.highlight_phase2_edges() else []
 
@@ -67,15 +67,15 @@ class StrategyUI:
         mapeador,
         category_key: str,
         strategy_key: str,
-        circulos: Dict[str, List[int]],
-        circle_palette: List[str],
-        atributos_amigos: Dict[int, List[int]],
-        vecinos_validos: List[int],
+        circulos: dict[str, list[int]],
+        circle_palette: list[str],
+        atributos_amigos: dict[int, list[int]],
+        vecinos_validos: list[int],
         phase: int,
         inferidos=None,
         elegido_por_categoria=None,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Construye la leyenda del grafo según fase, categoría y estrategia."""
         if phase < 2:
             return respuesta_leyenda("Sin leyenda", [])
@@ -128,7 +128,7 @@ class StrategyUI:
         mapeador,
         estrategia,
         circulos,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Panel de frecuencias de atributos en la vecindad (estrategia por defecto)."""
         from src.interfaz.indicadores import filas_frecuencia_categoria
 
@@ -149,7 +149,7 @@ class CirculosUI(StrategyUI):
         """Título de la leyenda en fase 2."""
         return "Círculos en la vecindad"
 
-    def _tarjetas_fase2(self, **ctx) -> List[Dict[str, Any]]:
+    def _tarjetas_fase2(self, **ctx) -> list[dict[str, Any]]:
         """Tarjetas de nodos para la leyenda de fase 2."""
         return tarjetas_circulos_fase2(
             ctx.get("circulos") or {},
@@ -181,7 +181,7 @@ class ComunidadesUI(StrategyUI):
         """Título de la leyenda en fase 2."""
         return "Comunidades locales"
 
-    def _tarjetas_fase2(self, **ctx) -> List[Dict[str, Any]]:
+    def _tarjetas_fase2(self, **ctx) -> list[dict[str, Any]]:
         """Tarjetas de nodos para la leyenda de fase 2."""
         return tarjetas_comunidades_fase2(
             ctx.get("estrategia"),
@@ -189,7 +189,7 @@ class ComunidadesUI(StrategyUI):
             ctx.get("vecinos_validos") or [],
         )
 
-    def _aristas_fase2(self, **ctx) -> List[Dict[str, Any]]:
+    def _aristas_fase2(self, **ctx) -> list[dict[str, Any]]:
         """Sin leyenda de aristas: el color del nodo ya identifica la comunidad."""
         return []
 
@@ -217,7 +217,7 @@ class PuentesUI(StrategyUI):
         """Título de la leyenda en fase 2."""
         return "Puentes de la red"
 
-    def _tarjetas_fase2(self, **ctx) -> List[Dict[str, Any]]:
+    def _tarjetas_fase2(self, **ctx) -> list[dict[str, Any]]:
         """Tarjetas de nodos para la leyenda de fase 2."""
         return tarjetas_puentes()
 
@@ -245,11 +245,11 @@ class TransitividadUI(StrategyUI):
         """Título de la leyenda en fase 2."""
         return "Expansión por transitividad"
 
-    def _tarjetas_fase2(self, **ctx) -> List[Dict[str, Any]]:
+    def _tarjetas_fase2(self, **ctx) -> list[dict[str, Any]]:
         """Tarjetas de nodos para la leyenda de fase 2."""
         return tarjetas_transitividad()
 
-    def _aristas_fase2(self, **ctx) -> List[Dict[str, Any]]:
+    def _aristas_fase2(self, **ctx) -> list[dict[str, Any]]:
         """Tarjetas de aristas para la leyenda de fase 2."""
         return tarjetas_aristas_transitividad()
 
@@ -277,7 +277,7 @@ class SimilitudUI(StrategyUI):
         """Título de la leyenda en fase 2."""
         return "Similitud estructural"
 
-    def _tarjetas_fase2(self, **ctx) -> List[Dict[str, Any]]:
+    def _tarjetas_fase2(self, **ctx) -> list[dict[str, Any]]:
         """Tarjetas de nodos para la leyenda de fase 2."""
         return tarjetas_similitud()
 
@@ -305,7 +305,7 @@ class PrestigioUI(StrategyUI):
         """Título de la leyenda en fase 2."""
         return "Prestigio en la vecindad"
 
-    def _tarjetas_fase2(self, **ctx) -> List[Dict[str, Any]]:
+    def _tarjetas_fase2(self, **ctx) -> list[dict[str, Any]]:
         """Tarjetas de nodos para la leyenda de fase 2."""
         return tarjetas_prestigio()
 
@@ -315,9 +315,9 @@ class PrestigioUI(StrategyUI):
 
     def render_insights(self, strategy_key, phase, grafo, ego_id, category_key, vecinos_validos, atributos_amigos, mapeador, estrategia, circulos):
         """Vecinos ordenados por PageRank en la ego-red."""
-        if not vecinos_validos or estrategia is None or not hasattr(estrategia, "_obtener_pagerank"):
+        pr_dict = estrategia.prestigio_pagerank() if estrategia is not None else None
+        if not vecinos_validos or not pr_dict:
             return {"title": "Prestigio", "rows": [], "note": None}
-        pr_dict = estrategia._obtener_pagerank() or {}
         rows = sorted(
             (
                 {

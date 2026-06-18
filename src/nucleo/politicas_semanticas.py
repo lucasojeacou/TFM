@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from .umbrales import (
     PENALIZACION_FRECUENCIA,
@@ -14,10 +14,10 @@ from .umbrales import (
 
 def clasificar_politica_categoria(
     categoria: str,
-    rango: Dict[str, int],
+    rango: dict[str, int],
     mapeador: Any,
-    atributos_amigos: Dict[int, List[int]],
-) -> Dict[str, Any]:
+    atributos_amigos: dict[int, list[int]],
+) -> dict[str, Any]:
     """Elige modo ruido, valor único o multi-valor según densidad y dispersión de la categoría."""
     cat_normalizada = str(categoria).strip().lower()
     palabras_prohibidas = {"birthday", "name"}
@@ -63,10 +63,10 @@ def clasificar_politica_categoria(
 
 
 def seleccionar_por_categoria(
-    puntuaciones: Dict[int, float],
+    puntuaciones: dict[int, float],
     mapeador: Any,
-    atributos_amigos: Dict[int, List[int]],
-) -> Tuple[List[int], Dict[str, Tuple[Any, float]]]:
+    atributos_amigos: dict[int, list[int]],
+) -> tuple[list[int], dict[str, tuple[Any, float]]]:
     """Convierte puntuaciones continuas en vector binario por categoría semántica."""
     if mapeador is None or not hasattr(mapeador, "esquema_rangos"):
         return [], {}

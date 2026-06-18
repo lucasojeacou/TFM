@@ -79,7 +79,7 @@ Tras ejecutar `main.py` se obtienen tres informes en `resultados/`:
 | **Auditoría y grafo XAI** | Contrasta valor real e inferido; al elegir una categoría, muestra el grafo y los nodos más influyentes |
 
 
-El simulador vuelve al paso inicial si cambias ego, estrategia o categoría. En la fase final, la inferencia se calcula una sola vez y el grafo refleja ese resultado.
+El simulador vuelve al paso inicial si cambias ego, estrategia o categoría. La inferencia se ejecuta en cada interacción de la pestaña; el avance por fases solo cambia la capa visual del grafo.
 
 ## Estrategias comparadas
 
@@ -114,8 +114,9 @@ TFM/
 ├── datos/            # Dataset SNAP
 ├── resultados/       # CSV generados
 ├── src/
+│   ├── registro.py   # Registro único de estrategias
 │   ├── nucleo/       # Carga de datos, políticas y métricas
-│   ├── estrategias/  # Algoritmos de inferencia
+│   ├── estrategias/  # Algoritmos de inferencia y sus parámetros
 │   └── interfaz/     # Dashboard, grafo y visualización
 └── tests/            # Pruebas automáticas
 ```

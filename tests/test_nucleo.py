@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
-from src.interfaz.analisis import estado_categoria
-from src.nucleo.evaluacion import calcular_metricas_binarias, exportar_datos_incrementales
+from src.nucleo.evaluacion import (
+    calcular_metricas_binarias,
+    estado_categoria,
+    exportar_datos_incrementales,
+)
 from src.nucleo.umbrales import umbral_dinamico_categoria
 
 

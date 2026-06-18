@@ -8,10 +8,9 @@ import streamlit as st
 
 from src.estrategias.base import obtener_vecinos_validos
 from src.interfaz.analisis import cargar_instantanea, construir_auditoria, ejecutar_inferencia
-from src.interfaz.configuracion import STRATEGY_REGISTRY
+from src.registro import construir_estrategia
 from src.interfaz.dashboard.comun import renderizar_influencias, renderizar_leyenda_grafo
 from src.interfaz.grafo import renderizar_grafo
-from src.interfaz.inferencia import construir_estrategia
 from src.interfaz.ui import (
     categoria_clave_por_nombre,
     categoria_desde_tabla,
@@ -97,7 +96,6 @@ def renderizar_pestana_auditoria(
     mostrar_leyenda_valores = len(categorias_enfocadas) > 1
     vecinos = obtener_vecinos_validos(audit_snapshot.grafo, audit_snapshot.atributos_amigos, int(audit_ego_id))
     estrategia = construir_estrategia(
-        STRATEGY_REGISTRY,
         str(audit_strategy_key),
         audit_snapshot.grafo,
         audit_snapshot.atributos_amigos,

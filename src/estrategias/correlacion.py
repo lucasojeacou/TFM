@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import numpy as np
 
-from .base import EstrategiaInferencia
+from .base import EstrategiaInferencia, ResultadoInferencia
+from .parametros import CORRELACION_BOOST, CORRELACION_UMBRAL_ACTIVACION
 
 
 class EstrategiaCorrelacion(EstrategiaInferencia):
-    """Homofilia directa con boost (+30 %) por correlación cruzada entre atributos activos."""
+    """Homofilia directa con refuerzo por correlación cruzada entre atributos activos."""
 
-    def __init__(self, grafo, atributos_amigos, mapeador):
+    def __init__(self, grafo, atributos_amigos: dict[int, list[int]], mapeador) -> None:
         """Inicializa la estrategia con caché interna de matrices de correlación."""
         super().__init__(grafo, atributos_amigos, mapeador)
         self._cache_correlacion = None
@@ -41,7 +42,7 @@ class EstrategiaCorrelacion(EstrategiaInferencia):
         self._cache_correlacion = norm_matriz
         return norm_matriz
 
-    def inferir(self, nodo_id, circulos=None):
+    def inferir(self, nodo_id: int, circulos: dict[str, list[int]] | None = None) -> ResultadoInferencia:
         """Homofilia directa con refuerzo por coocurrencia cruzada de atributos."""
         vecinos = self.obtener_vecinos_validos(nodo_id)
         if not vecinos:
@@ -49,11 +50,11 @@ class EstrategiaCorrelacion(EstrategiaInferencia):
         matriz_attrs = np.array([self.atributos_amigos[v] for v in vecinos])
         freq_vec = np.mean(matriz_attrs, axis=0)
         scores_vec = freq_vec.copy()
-        mask = freq_vec > 0.5
+        mask = freq_vec > CORRELACION_UMBRAL_ACTIVACION
         if np.any(mask):
             coocurrencia = self._obtener_matriz_correlacion()
             boost_vec = np.dot(coocurrencia[mask].T, freq_vec[mask])
-            scores_vec = np.clip(freq_vec + 0.3 * boost_vec, 0.0, 1.0)
+            scores_vec = np.clip(freq_vec + CORRELACION_BOOST * boost_vec, 0.0, 1.0)
         puntuaciones = {i: float(val) for i, val in enumerate(scores_vec)}
         contrib_xai = matriz_attrs.T / len(vecinos)
         return self.finalizar_inferencia(vecinos, puntuaciones, contrib_xai)

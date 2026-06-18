@@ -1,15 +1,15 @@
 # Núcleo científico y análisis de grafos
-numpy>=2.0
-pandas>=2.2
-networkx>=3.4
+numpy==2.3.3
+pandas==2.3.3
+networkx==3.6.1
 
 # Dashboard interactivo y visualizaciones
-streamlit>=1.40
-plotly>=5.24
-pyvis>=0.3.2
+streamlit==1.57.0
+plotly==6.7.0
+pyvis==0.3.2
 
 # Detección de comunidades (algoritmo de Louvain)
-python-louvain>=0.16
+python-louvain==0.16
 
 # Suite de tests de integración analítica
-pytest>=8.0
+pytest==9.0.3

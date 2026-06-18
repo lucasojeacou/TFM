@@ -65,3 +65,16 @@ def exportar_resultados_csv(resultados, ruta_csv) -> None:
         escritor = csv.DictWriter(f, fieldnames=campos)
         escritor.writeheader()
         escritor.writerows(resultados)
+
+
+def estado_categoria(reales: list[int], predichos: list[int]) -> str:
+    """Etiqueta de acierto de una categoría: Correcto, Parcial, Fallido o Sin datos."""
+    reales_set = set(reales)
+    predichos_set = set(predichos)
+    if not reales_set and not predichos_set:
+        return "Sin datos"
+    if reales_set == predichos_set:
+        return "Correcto"
+    if not reales_set.isdisjoint(predichos_set):
+        return "Parcial"
+    return "Fallido"

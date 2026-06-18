@@ -1,12 +1,10 @@
-"""Descubrimiento de egos SNAP, carga cacheada y cálculo de layout del grafo."""
+"""Carga cacheada de ego-redes SNAP y cálculo de layout del grafo para el dashboard."""
 
 from __future__ import annotations
 
 import logging
 import math
 import random
-from pathlib import Path
-from typing import Dict, List, Tuple
 
 import networkx as nx
 import streamlit as st
@@ -27,26 +25,7 @@ _UMBRAL_KAMADA = 60
 _UMBRAL_RADIAL = 100
 
 
-def descubrir_ego_ids(ruta_datos: Path) -> List[int]:
-    """Ids con ficheros .edges y .egofeat disponibles."""
-    def _ids_por_glob(patron: str) -> set[int]:
-        """Extrae ids numéricos de ficheros que coinciden con el patrón glob."""
-        encontrados: set[int] = set()
-        for path in ruta_datos.glob(patron):
-            try:
-                encontrados.add(int(path.stem))
-            except ValueError:
-                logger.warning("Archivo ignorado por nombre no numérico: %s", path.name)
-        return encontrados
-
-    por_edges = _ids_por_glob("*.edges")
-    por_egofeat = _ids_por_glob("*.egofeat")
-    if por_edges and por_egofeat:
-        return sorted(por_edges & por_egofeat)
-    return sorted(por_edges | por_egofeat)
-
-
-def _centrar_en_ego(posiciones: Dict, ego_id) -> Dict:
+def _centrar_en_ego(posiciones: dict, ego_id) -> dict:
     """Traslada el layout para dejar el ego en el origen."""
     if ego_id not in posiciones:
         return dict(posiciones)
@@ -54,7 +33,7 @@ def _centrar_en_ego(posiciones: Dict, ego_id) -> Dict:
     return {nodo: (float(x - ex), float(y - ey)) for nodo, (x, y) in posiciones.items()}
 
 
-def _normalizar_posiciones(posiciones: Dict, ego_id, escala_objetivo: float = _ESCALA_LAYOUT) -> Dict:
+def _normalizar_posiciones(posiciones: dict, ego_id, escala_objetivo: float = _ESCALA_LAYOUT) -> dict:
     """Escala coordenadas a un radio máximo fijo."""
     if not posiciones or ego_id not in posiciones:
         return dict(posiciones)
@@ -72,7 +51,7 @@ def _normalizar_posiciones(posiciones: Dict, ego_id, escala_objetivo: float = _E
     }
 
 
-def _posiciones_iniciales_aleatorias(grafo, ego_id, semilla: int = 42) -> Dict:
+def _posiciones_iniciales_aleatorias(grafo, ego_id, semilla: int = 42) -> dict:
     """Semilla en disco para spring_layout sin simetría circular rígida."""
     rng = random.Random(semilla)
     n = max(1, grafo.number_of_nodes())
@@ -123,7 +102,7 @@ def _perturbar_posiciones(posiciones_radiales, ego_id, semilla=42):
     return perturbadas
 
 
-def calcular_posiciones(grafo: nx.Graph, ego_id) -> Dict:
+def calcular_posiciones(grafo: nx.Graph, ego_id) -> dict:
     """Kamada-Kawai en grafos pequeños; spring_layout con respaldo radial."""
     cantidad_nodos = grafo.number_of_nodes()
     if ego_id not in grafo or cantidad_nodos == 0:

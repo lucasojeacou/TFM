@@ -5,13 +5,13 @@ from __future__ import annotations
 from collections import defaultdict
 import numpy as np
 
-from .base import EstrategiaInferencia
+from .base import EstrategiaInferencia, ResultadoInferencia
 
 
 class EstrategiaCirculos(EstrategiaInferencia):
     """Atributos agregados con peso inverso a la raíz del tamaño de cada círculo."""
 
-    def inferir(self, nodo_id, circulos=None):
+    def inferir(self, nodo_id: int, circulos: dict[str, list[int]] | None = None) -> ResultadoInferencia:
         """Agrega atributos ponderando vecinos según pertenencia a círculos SNAP."""
         vecinos = self.obtener_vecinos_validos(nodo_id)
         if not vecinos:

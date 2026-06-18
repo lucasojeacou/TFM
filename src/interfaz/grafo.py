@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import math
-import numpy as np
 import networkx as nx
 import streamlit as st
 import streamlit.components.v1 as components
@@ -16,7 +15,7 @@ if TYPE_CHECKING:
 
 from src.interfaz.configuracion import (
     BASE_NODE_SIZE, EGO_SIZE, EGO_UNKNOWN_COLOR, EGO_WARNING_COLOR,
-    NEUTRAL_NODE_COLOR, NEUTRAL_OTHER_COLOR, ACTIVE_EDGE_COLOR, NEUTRAL_EDGE_COLOR
+    NEUTRAL_NODE_COLOR, NEUTRAL_OTHER_COLOR, NEUTRAL_EDGE_COLOR
 )
 from src.interfaz.inferencia import (
     etiqueta_atributo,
@@ -27,24 +26,13 @@ from src.interfaz.inferencia import (
     paleta_categoria,
     resolver_indice_inferido_ego,
 )
-from src.interfaz.visual import (
-    ACTIVE_NODE_LEGEND_COLOR,
-    BRIDGE_LEGEND_COLOR,
-    PRESTIGIO_COLOR_ALTO,
-    PRESTIGIO_COLOR_BAJO,
-    SECOND_HOP_LEGEND_COLOR,
-    circulo_visible_para_vecino,
-    colores_comunidades_vecinos,
-    interpolar_color,
-    paleta_circulos,
+from src.interfaz.estilos_fase2 import (
+    aplicar_estilos_aristas_fase2,
+    aplicar_estilos_nodos_fase2,
 )
 from src.estrategias.base import obtener_vecinos_validos
-from src.interfaz.ui import construir_estilo_nodo, construir_estilo_arista, hex_to_rgba
+from src.interfaz.ui import construir_estilo_nodo, construir_estilo_arista
 
-
-ACTIVE_NODE_COLOR = ACTIVE_NODE_LEGEND_COLOR
-SECOND_HOP_NODE_COLOR = SECOND_HOP_LEGEND_COLOR
-BRIDGE_NODE_COLOR = BRIDGE_LEGEND_COLOR
 
 PYVIS_OPTIONS_JSON = """
 {
@@ -76,40 +64,6 @@ def inicializar_aristas(grafo) -> dict[tuple[int, int], dict[str, object]]:
     return edge_rows
 
 
-def resaltar_aristas_ego(edge_rows, ego_id: int, vecinos_validos):
-    """Resalta con el color activo y mayor grosor las conexiones directas pertenecientes al ego."""
-    for vecino in vecinos_validos:
-        edge_rows[tuple(sorted((int(ego_id), int(vecino))))].update(
-            construir_estilo_arista(ACTIVE_EDGE_COLOR, width=1.4, opacity=0.52)
-        )
-
-
-def resaltar_aristas_transitividad(edge_rows, grafo, ego_id: int, vecinos_validos: Iterable[int], atributos_amigos):
-    """Resalta el primer y el segundo salto para acompañar la vista estructural de transitividad."""
-    vecinos_set = {int(vecino) for vecino in vecinos_validos}
-    for vecino in vecinos_set:
-        clave = tuple(sorted((int(ego_id), int(vecino))))
-        if clave in edge_rows:
-            edge_rows[clave].update(construir_estilo_arista(ACTIVE_EDGE_COLOR, width=0.72, opacity=0.24))
-
-    for vecino in vecinos_set:
-        if not grafo.has_node(vecino):
-            continue
-        for candidato in grafo.neighbors(vecino):
-            candidato_int = int(candidato)
-            if candidato_int == int(ego_id) or candidato_int in vecinos_set:
-                continue
-            if atributos_amigos is not None and candidato_int not in atributos_amigos:
-                continue
-            clave = tuple(sorted((int(vecino), candidato_int)))
-            if clave in edge_rows:
-                edge_rows[clave].update({
-                    "color": hex_to_rgba("#60a5fa", 0.34),
-                    "width": 0.8,
-                    "dashes": True
-                })
-
-
 def construir_estilo_nodo_categoria(nodo, category_key, mapeador, atributos_amigos, perfil_ego) -> tuple[str, str]:
     """Determina el color y la etiqueta visual del nodo vecino segun sus atributos activos de la categoria."""
     values = atributos_amigos.get(nodo, perfil_ego)
@@ -137,43 +91,6 @@ def construir_estilo_ego(category_key, mapeador, elegido_por_categoria, inferido
     return color, titulo, float(score)
 
 
-def _actualizar_nodo(node_rows: dict[int, dict[str, object]], nodo_int: int, **props) -> None:
-    """Aplica un bloque de propiedades al nodo sin repetir la misma ruta de actualizacion."""
-    node_rows.setdefault(nodo_int, {}).update(props)
-
-
-def _obtener_nodos_puente(estrategia) -> set[int]:
-    """Identifica los nodos puente mejor posicionados segun la centralidad calculada por el backend."""
-    if estrategia is None or not hasattr(estrategia, "_obtener_centralidad"):
-        return set()
-    centralidad = estrategia._obtener_centralidad() or {}
-    if not centralidad:
-        return set()
-    ordenados = sorted(((int(nodo), float(peso)) for nodo, peso in centralidad.items()), key=lambda item: item[1], reverse=True)
-    limite = min(len(ordenados), max(3, int(np.ceil(len(ordenados) * 0.1))))
-    umbral = ordenados[limite - 1][1]
-    return {nodo for nodo, peso in ordenados if peso > 0.0 and peso >= umbral}
-
-
-def _obtener_nodos_segundo_salto(grafo, ego_id: int | None, vecinos_validos: Iterable[int], atributos_amigos) -> set[int]:
-    """Calcula los nodos de segundo salto que intervienen en la expansión estructural de transitividad."""
-    if ego_id is None:
-        return set()
-    vecinos_set = {int(vecino) for vecino in vecinos_validos}
-    nodos_segundo_salto: set[int] = set()
-    for vecino in vecinos_set:
-        if not grafo.has_node(vecino):
-            continue
-        for candidato in grafo.neighbors(vecino):
-            candidato_int = int(candidato)
-            if candidato_int == int(ego_id) or candidato_int in vecinos_set:
-                continue
-            if atributos_amigos is not None and candidato_int not in atributos_amigos:
-                continue
-            nodos_segundo_salto.add(candidato_int)
-    return nodos_segundo_salto
-
-
 def procesar_propiedades_nodos(
     grafo,
     posiciones,
@@ -185,7 +102,7 @@ def procesar_propiedades_nodos(
     estrategia=None,
     atributos_amigos=None,
 ) -> dict[int, dict[str, object]]:
-    """Aplica el comportamiento adaptativo de la fase 2 sin alterar el veredicto plano de la fase 4."""
+    """Inicializa el estado geométrico de los nodos y, en fase 2, delega el coloreado por estrategia."""
     node_rows: dict[int, dict[str, object]] = {}
     for nodo in grafo.nodes():
         nodo_int = int(nodo)
@@ -198,117 +115,16 @@ def procesar_propiedades_nodos(
     if phase != 2:
         return node_rows
 
-    strategy_key_normalizada = str(strategy_key).strip().lower()
-    vecinos_set = {int(vecino) for vecino in vecinos_validos}
-    colores_circulos = paleta_circulos(circulos)
-    nodos_puente = _obtener_nodos_puente(estrategia)
-    nodos_segundo_salto = _obtener_nodos_segundo_salto(grafo, ego_id, vecinos_set, atributos_amigos)
-
-    comunidades_dict, colores_comunidades = colores_comunidades_vecinos(estrategia, ego_id, vecinos_set)
-
-    nodos_alta_sim = set()
-    sim_dict = {}
-    if strategy_key_normalizada == "similitud":
-        if estrategia is not None and hasattr(estrategia, "_obtener_similitudes_estructurales") and ego_id is not None:
-            top_similares = estrategia._obtener_similitudes_estructurales(ego_id) or []
-            nodos_alta_sim = {int(v) for v, _ in top_similares}
-            sim_dict = {int(v): val for v, val in top_similares}
-
-    for nodo in grafo.nodes():
-        nodo_int = int(nodo)
-        props = node_rows.setdefault(nodo_int, {})
-
-        if strategy_key_normalizada == "circulos":
-            circulo_info = circulo_visible_para_vecino(nodo_int, vecinos_set, circulos, colores_circulos)
-            if circulo_info is not None:
-                color_circulo, circle_name = circulo_info
-                _actualizar_nodo(
-                    node_rows,
-                    nodo_int,
-                    color=color_circulo,
-                    size=BASE_NODE_SIZE + 1,
-                    label="",
-                    title=f"Vecino en círculo: {circle_name}",
-                )
-            continue
-
-        if strategy_key_normalizada == "puentes":
-            if nodo_int in nodos_puente:
-                centralidad = 0.0
-                if estrategia is not None and hasattr(estrategia, "_obtener_centralidad"):
-                    centralidad = float((estrategia._obtener_centralidad() or {}).get(nodo_int, 0.0))
-                _actualizar_nodo(
-                    node_rows,
-                    nodo_int,
-                    color=BRIDGE_NODE_COLOR,
-                    size=BASE_NODE_SIZE + 2,
-                    label="",
-                    title=f"Puente crítico | centralidad {centralidad:.3f}",
-                )
-            elif nodo_int in vecinos_set:
-                _actualizar_nodo(node_rows, nodo_int, color=NEUTRAL_NODE_COLOR, size=BASE_NODE_SIZE, label="", title=str(nodo_int))
-            continue
-
-        if strategy_key_normalizada == "transitividad":
-            if nodo_int in vecinos_set:
-                _actualizar_nodo(node_rows, nodo_int, color=ACTIVE_NODE_COLOR, size=BASE_NODE_SIZE + 1, label="", title=f"Vecino directo | Nodo {nodo_int}")
-            elif nodo_int in nodos_segundo_salto:
-                _actualizar_nodo(node_rows, nodo_int, color=SECOND_HOP_NODE_COLOR, size=BASE_NODE_SIZE + 1, label="", title=f"Segundo salto | Nodo {nodo_int}")
-            continue
-
-        if strategy_key_normalizada == "prestigio":
-            if nodo_int in vecinos_set:
-                pr_dict = (estrategia._obtener_pagerank() or {}) if estrategia is not None and hasattr(estrategia, "_obtener_pagerank") else {}
-                pagerank_val = float(pr_dict.get(nodo_int, 0.0))
-                vecinos_prs = [float(pr_dict.get(v, 0.0)) for v in vecinos_set]
-                min_pr = min(vecinos_prs) if vecinos_prs else 0.0
-                max_pr = max(vecinos_prs) if vecinos_prs else 1.0
-                intensidad = (pagerank_val - min_pr) / (max_pr - min_pr) if max_pr - min_pr > 0 else 0.5
-                color = interpolar_color(PRESTIGIO_COLOR_BAJO, PRESTIGIO_COLOR_ALTO, intensidad)
-                size = BASE_NODE_SIZE + 1 + int(round(intensidad * 3.0))
-                _actualizar_nodo(
-                    node_rows,
-                    nodo_int,
-                    color=color,
-                    size=size,
-                    label="",
-                    title=f"Vecino directo | Prestigio {pagerank_val:.4f}",
-                )
-            continue
-
-        if strategy_key_normalizada == "comunidades":
-            if nodo_int in vecinos_set and nodo_int in comunidades_dict:
-                cid = comunidades_dict[nodo_int]
-                color = colores_comunidades.get(cid, ACTIVE_NODE_COLOR)
-                _actualizar_nodo(
-                    node_rows,
-                    nodo_int,
-                    color=color,
-                    size=BASE_NODE_SIZE + 1,
-                    label="",
-                    title=f"Vecino (Comunidad {cid}) | Nodo {nodo_int}",
-                )
-            continue
-
-        if strategy_key_normalizada == "similitud":
-            if nodo_int in nodos_alta_sim:
-                sim_val = sim_dict.get(nodo_int, 0.0)
-                _actualizar_nodo(
-                    node_rows,
-                    nodo_int,
-                    color="#facc15",
-                    size=BASE_NODE_SIZE + 2,
-                    label="",
-                    title=f"Alta similitud estructural | Puntuación {sim_val:.3f}",
-                )
-            elif nodo_int in vecinos_set:
-                _actualizar_nodo(node_rows, nodo_int, color=ACTIVE_NODE_COLOR, size=BASE_NODE_SIZE + 1, label="", title=f"Vecino directo | Nodo {nodo_int}")
-            continue
-
-        if nodo_int in vecinos_set:
-            _actualizar_nodo(node_rows, nodo_int, color=ACTIVE_NODE_COLOR, size=BASE_NODE_SIZE + 1, label="", title=f"Vecino directo | Nodo {nodo_int}")
-
-    return node_rows
+    return aplicar_estilos_nodos_fase2(
+        node_rows,
+        grafo,
+        strategy_key,
+        ego_id,
+        vecinos_validos,
+        circulos,
+        estrategia,
+        atributos_amigos,
+    )
 
 
 def inicializar_nodos(
@@ -508,36 +324,17 @@ def renderizar_grafo(
     from src.interfaz.plugins import get_strategy_ui
     plugin = get_strategy_ui(strategy_key)
 
-    if phase == 2 and plugin.highlight_phase2_edges():
-        resaltar_aristas_ego(edge_rows, ego_id, vecinos_validos)
-    if phase == 2 and strategy_key == "transitividad":
-        resaltar_aristas_transitividad(edge_rows, grafo, ego_id, vecinos_validos, atributos_amigos)
-    if phase == 2 and strategy_key in ("puentes", "prestigio", "similitud"):
-        for clave in edge_rows:
-            edge_rows[clave].update({
-                "color": hex_to_rgba(NEUTRAL_EDGE_COLOR, 0.08),
-                "width": 0.28
-            })
-    if phase == 2 and strategy_key == "comunidades":
-        comunidades_dict, colores_comunidades = colores_comunidades_vecinos(estrategia, ego_id, vecinos_validos)
-        for clave in edge_rows:
-            edge_rows[clave].update({
-                "color": hex_to_rgba(NEUTRAL_EDGE_COLOR, 0.08),
-                "width": 0.28
-            })
-        for u, v in grafo.edges():
-            u_int, v_int = int(u), int(v)
-            if u_int in comunidades_dict and v_int in comunidades_dict:
-                cid_u = comunidades_dict[u_int]
-                cid_v = comunidades_dict[v_int]
-                if cid_u == cid_v:
-                    clave = tuple(sorted((u_int, v_int)))
-                    if clave in edge_rows:
-                        color_c = colores_comunidades.get(cid_u, ACTIVE_EDGE_COLOR)
-                        edge_rows[clave].update({
-                            "color": hex_to_rgba(color_c, 0.48),
-                            "width": 0.95
-                        })
+    if phase == 2:
+        aplicar_estilos_aristas_fase2(
+            edge_rows,
+            grafo,
+            strategy_key,
+            ego_id,
+            vecinos_validos,
+            atributos_amigos,
+            estrategia,
+            resaltar_aristas_ego=plugin.highlight_phase2_edges(),
+        )
     atributos_enfocados = normalizar_lista_atributos(atributo_enfocado)
 
     if phase >= 3 and not atributos_enfocados:
