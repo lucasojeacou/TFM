@@ -2,7 +2,7 @@
 
 Trabajo Fin de Máster sobre **privacidad relacional** en redes sociales: estudia hasta qué punto se pueden inferir atributos personales de un usuario a partir de la información de sus contactos, aunque ese usuario no los haya revelado directamente.
 
-El proyecto trabaja con ego-redes de Facebook (dataset SNAP), compara ocho enfoques de inferencia y ofrece un **dashboard interactivo** para analizar resultados, simular el proceso paso a paso y explicar qué nodos influyen en cada predicción.
+El proyecto trabaja con ego-redes de Facebook del dataset [SNAP Social Circles](https://snap.stanford.edu/data/egonets-Facebook.html), compara ocho enfoques de inferencia y ofrece un **dashboard interactivo** para analizar resultados, simular el proceso paso a paso y explicar qué nodos influyen en cada predicción.
 
 ## Qué incluye
 
@@ -16,7 +16,7 @@ El proyecto trabaja con ego-redes de Facebook (dataset SNAP), compara ocho enfoq
 **Requisitos:** Python 3.11+, dataset SNAP de Facebook ego networks, entorno virtual recomendado.
 
 ```bash
-git clone <url-de-tu-repositorio>
+git clone https://github.com/lucasojeacou/TFM.git
 cd TFM
 python -m venv .venv
 ```
@@ -37,9 +37,11 @@ pip install -r requirements.txt
 
 ## Datos
 
-Coloca los ficheros del dataset en `datos/facebook/`. Por cada usuario (ego ID) se necesitan, como mínimo, los archivos de enlaces, atributos del ego, atributos de amigos y nombres de atributos (formato estándar SNAP: `.edges`, `.egofeat`, `.feat`, `.featnames`; opcionalmente `.circles`).
+Descarga el dataset desde [SNAP Social Circles: Facebook](https://snap.stanford.edu/data/egonets-Facebook.html) y coloca los ficheros en `datos/facebook/`. Por cada usuario (ego ID) se necesitan, como mínimo, los archivos de enlaces, atributos del ego, atributos de amigos y nombres de atributos (formato estándar SNAP: `.edges`, `.egofeat`, `.feat`, `.featnames`; opcionalmente `.circles`).
 
 El sistema detecta automáticamente qué ego-redes están completas y pueden procesarse.
+
+> `datos/` y `resultados/*.csv` no están en el repositorio (`.gitignore`). Tras clonar hay que añadir el dataset y ejecutar `main.py` para generar los informes.
 
 ## Uso
 
@@ -57,10 +59,11 @@ Si alguna ego-red falla al cargarse, se registra el error y se continúa con las
 streamlit run dashboard.py
 ```
 
+La pestaña **Resultados** lee los CSV del batch; conviene ejecutar `main.py` antes. **Simulador** y **Auditoría** cargan la ego-red en memoria y ejecutan la inferencia localmente, sin conexión a internet.
+
 ## Resultados
 
 Tras ejecutar `main.py` se obtienen tres informes en `resultados/`:
-
 
 | Salida                  | Descripción                                     |
 | ----------------------- | ----------------------------------------------- |
@@ -68,21 +71,17 @@ Tras ejecutar `main.py` se obtienen tres informes en `resultados/`:
 | Explicabilidad          | Qué amigos contribuyen a cada atributo inferido |
 | Predicciones            | Atributos activados por ego y estrategia        |
 
-
 ## Dashboard
-
 
 | Vista                     | Para qué sirve                                                                                         |
 | ------------------------- | ------------------------------------------------------------------------------------------------------ |
-| **Resultados**            | Compara el rendimiento de las estrategias con gráficos y tablas                                        |
+| **Resultados**            | Compara el rendimiento de las estrategias con gráficos y tablas (datos del batch)                      |
 | **Simulador**             | Recorre el proceso de inferencia en cuatro fases sobre un ego y una categoría                          |
 | **Auditoría y grafo XAI** | Contrasta valor real e inferido; al elegir una categoría, muestra el grafo y los nodos más influyentes |
-
 
 El simulador vuelve al paso inicial si cambias ego, estrategia o categoría. La inferencia se ejecuta en cada interacción de la pestaña; el avance por fases solo cambia la capa visual del grafo.
 
 ## Estrategias comparadas
-
 
 | Estrategia               | Idea                                      |
 | ------------------------ | ----------------------------------------- |
@@ -94,7 +93,6 @@ El simulador vuelve al paso inicial si cambias ego, estrategia o categoría. La 
 | Correlación de atributos | Refuerzo por coocurrencia entre atributos |
 | Puentes de la red        | Nodos que conectan grupos distintos       |
 | Prestigio social         | Peso según centralidad de los contactos   |
-
 
 ## Cómo se toma la decisión
 
@@ -111,8 +109,8 @@ Así, todas las estrategias comparten la misma lógica de corte y la comparació
 TFM/
 ├── main.py           # Evaluación batch
 ├── dashboard.py      # Interfaz web
-├── datos/            # Dataset SNAP
-├── resultados/       # CSV generados
+├── datos/            # Dataset SNAP (local, no versionado)
+├── resultados/       # CSV generados (no versionados)
 ├── src/
 │   ├── registro.py   # Registro único de estrategias
 │   ├── nucleo/       # Carga de datos, políticas y métricas
