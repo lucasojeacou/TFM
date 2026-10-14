@@ -2,6 +2,7 @@
 numpy==2.3.3
 pandas==2.3.3
 networkx==3.6.1
+scipy==1.16.2
 
 # Dashboard interactivo y visualizaciones
 streamlit==1.57.0
